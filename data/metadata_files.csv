@@ -1,0 +1,9 @@
+File,Description
+LOI200_snow_mm.asc,SnowDepth variable as raster grid (30m) for study area
+LOI200_Meandbh_cm.asc,NewDBH variable as raster grid (30m) for study area
+LOI200_MeanBA_m.asc,NewBA variable as raster grid (30m) for study area
+LOI200_lcprop.asc,LCProp variable as raster grid (30m) for study area
+LOI200_dlc_km_scenario.asc,DistanceLC variable with scenario stands removed as raster grid (30m) for study area
+LOI200_dlc_km.asc,DistanceLC variable as raster grid (30m) for study area
+LOI200.csv,Data table of variables for 51 sites
+covtyp_rc.asc,Forest cover types as raster grid (30m) for study area

@@ -1,0 +1,13 @@
+Variable,Units,Description
+Site,NA,site id
+logDD,deer per sq km (log10),estimated deer density
+DistanceLC,km,distance to the nearest lowland conifer stand
+NewDBH,cm,mean diameter at breast height
+NewBA,m,mean basal area
+SnowDepth,mm,estimated annual snow depth
+LCProp,proportion,proportion of 200m landscape of interest covered by lowland conifer
+Ecoregion,NA,"ecoregion of site, from Albert (1995)"
+AspenProp,proportion,proportion of 200m landscape of interest covered by aspen
+HdwdProp,proportion,proportion of 200m landscape of interest covered by hardwoods
+LCProp,proportion,proportion of 200m landscape of interest covered by lowland conifer
+CountStands,NA,total number of stands within 200m landscape of interest

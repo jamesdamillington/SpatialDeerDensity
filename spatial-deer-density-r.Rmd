@@ -3,7 +3,7 @@ title: "Modelling Spatial Deer Distribution using R"
 output:
   pdf_document: default
   html_document: default
-date: "08/11/2020"
+date: "17/10/2021"
 ---
 
 
@@ -20,8 +20,8 @@ library(viridis)    #for plotting palette
 ## Section 1: Loading and Checking Data
 
 ```{r }
-setwd("/Users/bowenzhang/Downloads/MichiganData")
-LOI200 <- read.csv("LOI200.csv", header = T)
+#setwd("/Users/bowenzhang/Downloads/MichiganData")
+LOI200 <- read.csv("data/LOI200.csv", header = T)
 head(LOI200) 
 ```
 
@@ -241,8 +241,8 @@ First load a raster map in which the value of each pixel is the distance to the 
 ```{r}
 library(raster)
 library(viridis)
-setwd("/Users/bowenzhang/Downloads/MichiganData")
-DistanceLC <- raster("LOI200_dlc_km.asc")      #to create the raster object simply provide file name
+#setwd("/Users/bowenzhang/Downloads/MichiganData")
+DistanceLC <- raster("data/LOI200_dlc_km.asc")      #to create the raster object simply provide file name
 plot(DistanceLC)                               #check it looks about right
 names(DistanceLC) <- "DistanceLC"              #assign name that matched that used in the regression model for this variable
 ```
@@ -260,7 +260,9 @@ plot(10^p_dlc, col=viridis_pal(option="D")(255))
 
 ### Task 4.
 
-Use code in this section to create a predicted deer density map for the 'best model' (i.e. using `LOI200_dlc_km.asc` and `LOI200_Meandbh_cm.asc` as predictor maps).
+Use code in this section to create a predicted deer density map for the 'best model' (i.e. using `LOI200_dlc_km.asc` and `LOI200_Meandbh_cm.asc` as predictor maps). 
+
+_Hint:_ to predict a model across multiple raster grids you will need to create a [raster stack](https://rspatial.org/raster/spatial/4-rasterdata.html#rasterstack-and-rasterbrick).
 
 ```{r}
 #answer here
@@ -291,7 +293,7 @@ So far we have a map of predicted deer density across the entire study area. How
 Load a raster map in which each pixel is a categorical land cover:
 
 ```{r}
-LandCov <- raster("/Users/bowenzhang/Downloads/MichiganData/covtyp_rc.asc")             #simply provide file name
+LandCov <- raster("data/covtyp_rc.asc")             #simply provide file name
 plot(LandCov)                                  #check it looks about right
 ```
 The landcov map indicates categories by numbers; we can change this so they are more appropriately represented:
@@ -312,7 +314,7 @@ levelplot(LandCov, att = 'landcover', col.regions=c('wheat1', 'orange2', 'darkol
 Now let's create the hardwood mask:
 
 ```{r}
-hdwd <- raster("/Users/bowenzhang/Downloads/MichiganData/covtyp_rc.asc")   #create a dummy raster named hdwd
+hdwd <- raster("data/covtyp_rc.asc")   #create a raster named hdwd
 hdwd[LandCov != 6] <- NA          #if a pixel is not hardwood in LandCov set to NA in hdwd
 plot(hdwd)                        #check the mask looks right (compare to the previous map)
 ```
@@ -332,7 +334,7 @@ Great, we've created a map of deer density as predicted from distance to nearest
 First load in another predictor map - this one in which the value of each pixel is the mean dbh of the local (200m) region:
 
 ```{r}
-NewDBH <- raster("/Users/bowenzhang/Downloads/MichiganData/LOI200_Meandbh_cm.asc")      #simply provide file name
+NewDBH <- raster("data/LOI200_Meandbh_cm.asc")      #simply provide file name
 plot(NewDBH)                                   #check it looks about right
 names(NewDBH) <- "NewDBH"                      #assign name that matched that used in the regression model for this variable
 ```
@@ -343,7 +345,6 @@ p_dlc_dbh <- predict(stack_dlc_dbh, mod_dlc_dbh)
 ```
 
 Let's apply the mask then plot it up:
-
 ```{r}
 p_dlc_dbh <- mask(p_dlc_dbh, hdwd)
 levelplot(10^p_dlc_dbh, par.settings = myTheme, at=seq(5, 35, length=12), colorkey=list(at=seq(5, 35, length=12)), margin = F)
@@ -354,7 +355,7 @@ The plot just created should look pretty similar to Fig 5a in Millington et al. 
 Absent from the map we just created is the shading to indicate the location of lowland conifer stands (distance to which is an important predictor in the model). To add this shading first we need to create the shaded layer (similar to creating the `hdwd` object above):
 
 ```{r}
-LC <- raster("/Users/bowenzhang/Downloads/MichiganData/covtyp_rc.asc")
+LC <- raster("data/covtyp_rc.asc")
 LC[LandCov != 2] <- NA
 LC <- ratify(LC)
 LCrat <- levels(LC)[[1]]
@@ -379,6 +380,8 @@ DLCplot + as.layer(LCplot, under = TRUE)
 
 ### Task 5.
 Use the LOI200_dlc_km_scenario.asc file to produce a predicted deer density map for a scenario in which selected lowland conifer stands have been removed from the landscape (as shown in Fig 6 of Millington _et al._ 2010)
+
+_Hint:_ as in Task 4 you'll need to use a raster stack, but this time using `LOI200_dlc_km_scenario.asc`
 
 ```{r}
 #answer here

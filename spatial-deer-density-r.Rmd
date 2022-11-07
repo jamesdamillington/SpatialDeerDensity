@@ -3,7 +3,7 @@ title: "Modelling Spatial Deer Distribution using R"
 output:
   pdf_document: default
   html_document: default
-date: "17/10/2021"
+date: "04/11/2022"
 ---
 
 
@@ -13,14 +13,16 @@ This notebook contains **R code** and exercises associated with concepts discuss
 #use install.packages(LIBRARY_NAME) into the console window to install, then lines below import
 library(ggplot2)    #for nicer plotting
 library(caret)      #for cross-validation
-library(raster)     #for spatial estimation
+library(terra)     #for spatial estimation
 library(viridis)    #for plotting palette
+library(colorspace)  #for heat_hcl
+library(leaflet)    #for plotting palette
 ```
 
 ## Section 1: Loading and Checking Data
 
 ```{r }
-#setwd("/Users/bowenzhang/Downloads/MichiganData")
+#setwd("/Users/bowenzhang/Downloads/Michigan")
 LOI200 <- read.csv("data/LOI200.csv", header = T)
 head(LOI200) 
 ```
@@ -54,6 +56,10 @@ We find some weak, but statistically significant (at the 95% confidence level) c
 
 The next piece of analysis we will do is to fit simple linear regression models to predict log(deer density) from environmental co-variates:
 
+```{r}
+mod_dlc <- lm(logDD ~ DistanceLC, data = LOI200)       #fit a model and assign to a model object named mod_dlc
+summary(mod_dlc)                                       #get the summary of the fitted model
+```
 
 ```{r}
 mod_dlc <- lm(logDD ~ DistanceLC, data = LOI200)       #fit a model and assign to a model object named mod_dlc
@@ -143,15 +149,7 @@ cor.test(LOI200$logDD, pred.mod_dlc_dbh, method = "kendall")
 Use the code above to write your own code to calculate the values in Table 2 of Millington _et al._ (2010) for the Full Model (all values except for cross-validation)
 
 ```{r}
-#possible answer
-mod_full <- lm(logDD ~ DistanceLC + NewDBH + NewBA + LCProp + SnowDepth, data = LOI200)   #fit a model and assign to a model object
-summary(mod_full)                                            #get the summary of the fitted model
-pred.mod_full <- predict(mod_full)
-tau <- cor.test(LOI200$logDD, pred.mod_full, method = "kendall")$estimate
-r2 <- cor.test(LOI200$logDD, pred.mod_full, method = "pearson")$estimate^2
-
-print(round(tau, 2))
-print(round(r2, 2))
+#answer here
 ```
 ## Section 4. Cross-validation
 
@@ -233,24 +231,21 @@ Build on the code above to calculate the cross-validation values for the 'Full' 
 ```{r}
 #answer here
 ```
-## Section 5. Spatial Estimation
-Later in Millington _et al._ (2010) models fit from the sample data (at 51 locations) were used to predict deer density across a subsection of the study area. We can do this in R using the functionality in the `raster` package.
+## Section 6. Spatial Estimation
+Later in Millington _et al._ (2010) models fit from the sample data (at 51 locations) were used to predict deer density across a subsection of the study area. We can do this in R using the functionality in the `terra` package.
 
 First load a raster map in which the value of each pixel is the distance to the nearest lowland conifer pixel:
 
 ```{r}
-library(raster)
-library(viridis)
-#setwd("/Users/bowenzhang/Downloads/MichiganData")
-DistanceLC <- raster("data/LOI200_dlc_km.asc")      #to create the raster object simply provide file name
+DistanceLC <- rast("data/LOI200_dlc_km.asc")      #to create the raster object simply provide file name
 plot(DistanceLC)                               #check it looks about right
 names(DistanceLC) <- "DistanceLC"              #assign name that matched that used in the regression model for this variable
 ```
 
-This first map is all we need to predict deer density based on distance to lowland conifer only we do this using the predict functionality of the raster package to apply the model parameter estimates to the spatial map 
+This first map is all we need to predict deer density based on distance to lowland conifer only we do this using the predict functionality of the `terra` package to apply the model parameter estimates to the spatial map 
 
 ```{r}
-p_dlc <- predict(DistanceLC, mod_dlc)         #first term is the raster, second is the model we fit above
+p_dlc <- terra::predict(DistanceLC, model=mod_dlc, fun=predict)         #first term is the raster, second is the model we fit above
 plot(p_dlc, col=viridis_pal(option="D")(255))   #use viridis palette to match python output
 ```
 The map we have made is of log(deer density) - to get to linear deer density we need to raise to power 10:
@@ -260,9 +255,9 @@ plot(10^p_dlc, col=viridis_pal(option="D")(255))
 
 ### Task 4.
 
-Use code in this section to create a predicted deer density map for the 'best model' (i.e. using `LOI200_dlc_km.asc` and `LOI200_Meandbh_cm.asc` as predictor maps). 
+Use code in this section to create a predicted deer density map for the 'best model' (i.e. using `LOI200_dlc_km.asc` and `LOI200_Meandbh_cm.asc` as predictor maps).
 
-_Hint:_ to predict a model across multiple raster grids you will need to create a [raster stack](https://rspatial.org/raster/spatial/4-rasterdata.html#rasterstack-and-rasterbrick).
+_Hint:_ to predict a model across multiple raster grids you will need to create a 'stack' of rasters by [combining them into a single object](https://rspatial.github.io/terra/reference/c.html).
 
 ```{r}
 #answer here
@@ -270,84 +265,96 @@ _Hint:_ to predict a model across multiple raster grids you will need to create 
 
 # Additional (not copied in python) 
 
-## Section 6. Map Visualisation
+## Section 7. Map Visualisation
 
-We can make the colours for look like in Millington _et al._ (2010) using functionality in some other packages:
-
+We can make the colours for look like in Millington _et al._ (2010) using functionality, from the `leaflet` package to scale the shades to compare directly between other predictions later:
 ```{r}
-library(colorspace)  #for heat_hcl
-library(rasterVis)  #for rasterTheme
-library(lattice)     #for levelplot
+#levelplot(10^p_dlc, par.settings = myTheme, at=seq(5, 35, length=12), colorkey=list(at=seq(5, 35, length=12)), margin = F, xlab=NULL, ylab=NULL)
+#myTheme <- heat_hcl(50, c = c(80,30), l = c(30,90), power = c(1/5, 1.5))  
+#plot(10^p_dlc, col= myTheme(seq(5, 35, length.out=12)))
 
-myTheme <- rasterTheme(region = heat_hcl(12, c = c(80,30), l = c(30,90), power = c(1/5, 1.5)))   #see https://www.nceas.ucsb.edu/~frazier/RSpatialGuides/colorPaletteCheatsheet.pdf
-
-levelplot(10^p_dlc, par.settings = myTheme, margin = F)
-```
-And [we can](http://stackoverflow.com/a/16848471) scale the shades to compare directly between other predictions later:
-```{r}
-levelplot(10^p_dlc, par.settings = myTheme, at=seq(5, 35, length=12), colorkey=list(at=seq(5, 35, length=12)), margin = F)
 ```
 
+```{r}
+myTheme <- heat_hcl(50, c = c(80,30), l = c(30,90), power = c(1/5, 1.5))
+
+the_palette_fc <- leaflet::colorNumeric(palette = myTheme, 
+                                        domain = c(0,50))
+the_colors <- the_palette_fc(seq(minmax(10^p_dlc)[[1]],minmax(10^p_dlc)[[2]], length.out = 24))
+
+plot(10^p_dlc, col= the_colors)
+```
 So far we have a map of predicted deer density across the entire study area. However, sample data were collected only in hardwood stands so really we should only predict for hardwood stands. To do this we need to load a land cover map and then create a 'mask' (a map indicating hardwood pixels only). 
 
 Load a raster map in which each pixel is a categorical land cover:
 
 ```{r}
-LandCov <- raster("data/covtyp_rc.asc")             #simply provide file name
+LandCov <- rast("data/covtyp_rc.asc")             #simply provide file name
 plot(LandCov)                                  #check it looks about right
 ```
-The landcov map indicates categories by numbers; we can change this so they are more appropriately represented:
+To analyse and plot the land cover map appropriately, we need to tell R that our raster object is categorical. We [do this](https://rdrr.io/cran/terra/man/factors.html) by:
+1. Creating a `data.frame` with two or more columns, the first identifying the (integer) cell values and the other column(s) providing the category labels
+2. Set the 'levels' of the raster object using the data.frame from 1. 
+
+First, the data.frame:
+
 ```{r}
-LandCov <- ratify(LandCov)     #tell R that the landcov raster is categorical                    
-rat <- levels(LandCov)[[1]]    #apply the levels (i.e. categories) 
-rat$landcover <- c("Aspen", "Lowland Conifer", "Other Decid", "Open", "Other EG", "Hardwood")   #Name the categories Aspen = 1, Lowland Conifer = 2, etc
-levels(LandCov) <- rat         #apply the named categories to the raster
+cls <- data.frame(id=1:6, cover=c("Aspen", "Lowland Conifer", "Other Decid", "Open", "Other EG", "Hardwood"))
+cls
+```
+
+Next set the levels (and plot to check):
+
+```{r}
+levels(LandCov) <- cls
 plot(LandCov)
 ```
-
-Note that the regular raster plot() function still has not picked up the categories. We can plot the categorical map more nicely using functionality in the `rasterVis` package:
+We can plot the categorical map more nicely by specifying our own colours:
 
 ```{r}
-levelplot(LandCov, att = 'landcover', col.regions=c('wheat1', 'orange2', 'darkolivegreen', 'gray', 'wheat2', 'forestgreen'))  #something weired with order of the colours vs levels
+plot(LandCov, col=c('wheat1', 'orange2', 'darkolivegreen', 'gray', 'wheat2', 'forestgreen'))  
 ```
-
 Now let's create the hardwood mask:
 
 ```{r}
-hdwd <- raster("data/covtyp_rc.asc")   #create a raster named hdwd
+hdwd <- rast("data/covtyp_rc.asc")   #create a dummy raster named hdwd
 hdwd[LandCov != 6] <- NA          #if a pixel is not hardwood in LandCov set to NA in hdwd
 plot(hdwd)                        #check the mask looks right (compare to the previous map)
 ```
-Now we can apply the mask to the p_dlc map for all pixels (using the raster `mask()` function)
+Now we can apply the mask to the p_dlc map for all pixels (using the terra `mask()` function)
 
 ```{r}
 p_dlc <- mask(p_dlc, hdwd)    #mask to see prediction for hardwood only
 ```
 
-And re-plot to check it worked!
+And re-plot to check it worked
 
 ```{r}
-levelplot(10^p_dlc, par.settings = myTheme, at=seq(5, 35, length=12), colorkey=list(at=seq(5, 35, length=12)), margin = F)
+plot(10^p_dlc, col= the_colors)
 ```
-Great, we've created a map of deer density as predicted from distance to nearest lowland conifer what if we wanted to predict using a multivariate model? To do that we need to create raster `stack` of (maps of) our predictor variables.
+Great, we've created a map of deer density as predicted from distance to nearest lowland conifer. But what if we wanted to predict using a multivariate model? To do that we need to create 'stack' of (maps of) our predictor variables.
 
 First load in another predictor map - this one in which the value of each pixel is the mean dbh of the local (200m) region:
 
 ```{r}
-NewDBH <- raster("data/LOI200_Meandbh_cm.asc")      #simply provide file name
+NewDBH <- rast("data/LOI200_Meandbh_cm.asc")      #simply provide file name
 plot(NewDBH)                                   #check it looks about right
 names(NewDBH) <- "NewDBH"                      #assign name that matched that used in the regression model for this variable
 ```
-Now create the raster `stack`. To predict using a multivariate model is now just the same as before, except the stack is passed instead of the single raster map:
+Now create a 'stack' of the raster layers. To predict using a multivariate model is now just the same as before, except the stack is passed instead of the single raster map:
 ```{r}
-stack_dlc_dbh <- stack(DistanceLC, NewDBH)
-p_dlc_dbh <- predict(stack_dlc_dbh, mod_dlc_dbh)
+stack_dlc_dbh <- c(DistanceLC, NewDBH)
+p_dlc_dbh <- terra::predict(stack_dlc_dbh, model=mod_dlc_dbh, fun=predict)
 ```
 
-Let's apply the mask then plot it up:
+Let's apply the mask then plot it up (scaling the colours for the values in the new map):
+
 ```{r}
 p_dlc_dbh <- mask(p_dlc_dbh, hdwd)
-levelplot(10^p_dlc_dbh, par.settings = myTheme, at=seq(5, 35, length=12), colorkey=list(at=seq(5, 35, length=12)), margin = F)
+
+the_colors <- the_palette_fc(seq(minmax(10^p_dlc_dbh)[[1]],minmax(10^p_dlc_dbh)[[2]], length.out = 24))
+
+plot(10^p_dlc_dbh, col=the_colors)
 ```
 
 The plot just created should look pretty similar to Fig 5a in Millington et al. (2010) [although not identical]
@@ -355,27 +362,22 @@ The plot just created should look pretty similar to Fig 5a in Millington et al. 
 Absent from the map we just created is the shading to indicate the location of lowland conifer stands (distance to which is an important predictor in the model). To add this shading first we need to create the shaded layer (similar to creating the `hdwd` object above):
 
 ```{r}
-LC <- raster("data/covtyp_rc.asc")
+LC <- rast("data/covtyp_rc.asc")
 LC[LandCov != 2] <- NA
-LC <- ratify(LC)
-LCrat <- levels(LC)[[1]]
-LCrat$landcover <- c("Lowland Conifer")
-levels(LC) <- LCrat
-levelplot(LC, col.regions = c('darkolivegreen'), margin = F, colorkey = F)
+levels(LC) <- cls
+plot(LC, col=c('darkolivegreen'))
 ```
 
-To combine layers in a single plot we need to create separate plot objects first:
+Now we can plot both laters on the map by including the `add` argument:
 ```{r}
-LCplot <- levelplot(LC, col.regions = c('darkolivegreen'), margin = F, colorkey = F)
-DLCplot <- levelplot(10^p_dlc_dbh, par.settings = myTheme, at=seq(5, 35, length=12), colorkey=list(at=seq(5, 35, length=12)), margin = F)
+#LCplot <- levelplot(LC, col.regions = c('darkolivegreen'), margin = F, colorkey = F)
+#DLCplot <- levelplot(10^p_dlc_dbh, par.settings = myTheme, at=seq(5, 35, length=12), colorkey=list(at=seq(5, 35, length=12)), margin = F)
 ```
-
-Then [combine](https://oscarperpinan.github.io/rastervis/#levelplot):
 
 ```{r}
-DLCplot + as.layer(LCplot, under = TRUE)
+plot(LC, col=c('darkolivegreen'), legend=F)
+plot(10^p_dlc_dbh, col=the_colors, add=T, legend=F)
 ```
-
 **Ta-da!**
 
 ### Task 5.
